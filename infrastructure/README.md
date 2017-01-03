@@ -50,12 +50,21 @@ So the steps to writing an app would be:
    what other containers (if any) it depends on. This will be equivalent to the `spec.containers`
    section of a [K8s deployment configuration](http://kubernetes.io/docs/user-guide/deployments/).
 
-Now when building or running the docker image the developer will have access to the following environment variables:
- - `HGT_EVENT_NAME="HackGT"`
- - `HGT_EVENT_START="YYYY/MM/DD HH:MM:SS`
- - `HGT_EVENT_END="YYYY/MM/DD HH:MM:SS`
- - `HGT_HOME_URL="https://hack.gt/"`
- - `HGT_HELPQ_URL="https://helpmewith.hack.gt/"` (might be empty if no help queue)
+Now when building or running the docker image the developer will have access to the entire event metadata
+(described later) in the form of JSON in an environment variable:
+
+```bash
+HACKATHON_METADATA='{"name":"HackGT","domain":"hack.gt", ...}'
+```
+
+This is helpful if you want to display the name of the event, etc. in your app.
+
+### Tests
+
+Every file that matches `/tests/Dockerfile` will spawn and run during testing.
+If you test different sections of your app, say one is called `websocket`, you can test
+the websocket capabilities of your app by writing tests in `websocket/tests/` then making
+a container to run the tests in.
 
 ## The Event Repo
 
@@ -68,10 +77,53 @@ times:
   - start: 12345
   - end: 12345
   - submission: 12345
-homepage: ""
-domain: ""
+homepage: "https://hack.gt/"
+domain: "hack.gt"
 apps:
- - "repo 1"
- - "repo 2"
- - etc.
+  hackgt/helpq:
+    - branch: master # this is default
+    - url: helpmewith.hack.gt
+  hackgt/eventbriter:
+    - domain: tickets
+  etc..
 ```
+
+This metadata gets its own repository and is given a special name: `hackathon.yaml`.
+
+## The CI
+
+So far so simple I think. We've pushed off most of the responsibilities away from the people writing
+the apps: they only need to provide a container and what resources they want to use (ports, DBs, etc.).
+
+The CI therefore, by process of elimination, will do all the work for us. Specifically it will:
+
+ - Spawn an instance of any app that is under review through a pull request
+ - Run tests on all apps under review through a pull request
+ - Find all `hackathon.yaml` files and
+   - Create a namespace for that event
+   - Create a load balancer for that hackathon behind its `metadata.domain`
+   - Run all apps' tests
+   - Spawn instances of all apps related to that hackathon
+   - Create a `hackathon.lock` file on each successful instantiation of all apps.
+
+This makes it easy to make a 'development event' in which all the development builds of all the apps
+are tested, kind of like having a conventional `dev` branch on each repo.
+This also makes sure that the development server will be held up to the same standards as all other events.
+
+Ideally there should be no reason to edit anything in the CI server, since all it does is scan repos
+for pull requests and `hackathon.yaml` files. So what CI shoud we use?
+
+### What's in a CI?
+
+My understanding of the CI landscape leads me away from conventional task runners and more towards CI that's geared
+towards pipelines. Pipelines are a very clear and intuitive flow of jobs.
+I would also like it to be difficult to make a change in the CI process that is not mirrored in git, since
+it will be running on k8s, it should be able to destroyed and rebuilt with ease.
+
+I prefer to not use Jenkins, as it does not support pipelines as first-class entities and makes it too easy
+to specify a script to be run in the build process that never sees the light of version control.
+
+I also prefer to not use any cloud services since it would make the entire system less portable.
+
+For these reasons I am partial to [Concourse](https://concourse.ci/index.html), they have some nice
+[propoganda](https://concourse.ci/concourse-vs.html) that will help the koolaid go down.
