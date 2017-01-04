@@ -61,10 +61,10 @@ This is helpful if you want to display the name of the event, etc. in your app.
 
 ### Tests
 
-Every file that matches `/tests/Dockerfile` will spawn and run during testing.
-If you test different sections of your app, say one is called `websocket`, you can test
-the websocket capabilities of your app by writing tests in `websocket/tests/` then making
-a container to run the tests in.
+Every Dockerfile that matches `/tests/Dockerfile` will be built and ran during testing.
+For example: if you have a websocket component of your app in `<git root>/websockets`
+you can write tests for it and create a container to run them in `websockets/tests/`.
+By doing this you create a Dockerfile in `websockets/tests/Dockerfile`, which matches.
 
 ## The Event Repo
 
@@ -84,11 +84,11 @@ apps:
     - branch: master # this is default
     - url: helpmewith.hack.gt
   hackgt/eventbriter:
-    - domain: tickets
+    - url: tickets.hack.gt
   etc..
 ```
 
-This metadata gets its own repository and is given a special name: `hackathon.yaml`.
+This metadata gets its own repository and is given a special name: `gaggle.yaml`.
 
 ## The CI
 
@@ -99,19 +99,22 @@ The CI therefore, by process of elimination, will do all the work for us. Specif
 
  - Spawn an instance of any app that is under review through a pull request
  - Run tests on all apps under review through a pull request
- - Find all `hackathon.yaml` files and
+ - Find all `gaggle.yaml` files and
    - Create a namespace for that event
    - Create a load balancer for that hackathon behind its `metadata.domain`
+   - Create a load balancer for each app to support rolling upgrades and redundancy
    - Run all apps' tests
    - Spawn instances of all apps related to that hackathon
    - Create a `hackathon.lock` file on each successful instantiation of all apps.
+   - NOTE: this process will happen anytime a gaggle.yaml file changes or any upstream
+     apps are updated
 
 This makes it easy to make a 'development event' in which all the development builds of all the apps
 are tested, kind of like having a conventional `dev` branch on each repo.
 This also makes sure that the development server will be held up to the same standards as all other events.
 
 Ideally there should be no reason to edit anything in the CI server, since all it does is scan repos
-for pull requests and `hackathon.yaml` files. So what CI shoud we use?
+for pull requests and `gaggle.yaml` files. So what CI shoud we use?
 
 ### What's in a CI?
 
